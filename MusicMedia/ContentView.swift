@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  MusicMedia
 //
-//  Created by Brockton Carnes on 3/13/25.
+//  Created by Brockton Carnes on 3/13/25 Initial Commit.
 //
 
 import SwiftUI
