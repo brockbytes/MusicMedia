@@ -6,6 +6,14 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D349EFFE2D83BFD0002A29B9 /* MediaPlayer.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D349EFFD2D83BFD0002A29B9 /* MediaPlayer.framework */; };
+		D349F40E2D850138002A29B9 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = D349F40D2D850138002A29B9 /* FirebaseAnalytics */; };
+		D349F4102D850138002A29B9 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D349F40F2D850138002A29B9 /* FirebaseAuth */; };
+		D349F4122D850138002A29B9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = D349F4112D850138002A29B9 /* FirebaseFirestore */; };
+		D349F4142D850138002A29B9 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = D349F4132D850138002A29B9 /* FirebaseStorage */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		D349EE1F2D839BDA002A29B9 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,11 +35,25 @@
 		D349EE0E2D839BD8002A29B9 /* MusicMedia.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MusicMedia.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D349EE1E2D839BDA002A29B9 /* MusicMediaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MusicMediaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		D349EE282D839BDA002A29B9 /* MusicMediaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MusicMediaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		D349EFFD2D83BFD0002A29B9 /* MediaPlayer.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MediaPlayer.framework; path = System/Library/Frameworks/MediaPlayer.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D349EF482D83B216002A29B9 /* Exceptions for "MusicMedia" folder in "MusicMedia" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = D349EE0D2D839BD8002A29B9 /* MusicMedia */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D349EE102D839BD8002A29B9 /* MusicMedia */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D349EF482D83B216002A29B9 /* Exceptions for "MusicMedia" folder in "MusicMedia" target */,
+			);
 			path = MusicMedia;
 			sourceTree = "<group>";
 		};
@@ -52,6 +74,11 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D349F40E2D850138002A29B9 /* FirebaseAnalytics in Frameworks */,
+				D349F4122D850138002A29B9 /* FirebaseFirestore in Frameworks */,
+				D349F4102D850138002A29B9 /* FirebaseAuth in Frameworks */,
+				D349F4142D850138002A29B9 /* FirebaseStorage in Frameworks */,
+				D349EFFE2D83BFD0002A29B9 /* MediaPlayer.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -72,6 +99,14 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		5E0C45C9B9BF0ED29BC6D1CC /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				D349EFFD2D83BFD0002A29B9 /* MediaPlayer.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		D349EE052D839BD8002A29B9 = {
 			isa = PBXGroup;
 			children = (
@@ -79,6 +114,7 @@
 				D349EE212D839BDA002A29B9 /* MusicMediaTests */,
 				D349EE2B2D839BDA002A29B9 /* MusicMediaUITests */,
 				D349EE0F2D839BD8002A29B9 /* Products */,
+				5E0C45C9B9BF0ED29BC6D1CC /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -111,8 +147,6 @@
 				D349EE102D839BD8002A29B9 /* MusicMedia */,
 			);
 			name = MusicMedia;
-			packageProductDependencies = (
-			);
 			productName = MusicMedia;
 			productReference = D349EE0E2D839BD8002A29B9 /* MusicMedia.app */;
 			productType = "com.apple.product-type.application";
@@ -134,8 +168,6 @@
 				D349EE212D839BDA002A29B9 /* MusicMediaTests */,
 			);
 			name = MusicMediaTests;
-			packageProductDependencies = (
-			);
 			productName = MusicMediaTests;
 			productReference = D349EE1E2D839BDA002A29B9 /* MusicMediaTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -157,8 +189,6 @@
 				D349EE2B2D839BDA002A29B9 /* MusicMediaUITests */,
 			);
 			name = MusicMediaUITests;
-			packageProductDependencies = (
-			);
 			productName = MusicMediaUITests;
 			productReference = D349EE282D839BDA002A29B9 /* MusicMediaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
@@ -195,6 +225,11 @@
 			);
 			mainGroup = D349EE052D839BD8002A29B9;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				D349F2762D83CDA4002A29B9 /* XCRemoteSwiftPackageReference "Kingfisher" */,
+				D349F2772D83CDD3002A29B9 /* XCRemoteSwiftPackageReference "SDWebImage" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D349EE0F2D839BD8002A29B9 /* Products */;
 			projectDirPath = "";
@@ -409,6 +444,8 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				"OTHER_CFLAGS[arch=*]" = "";
+				"OTHER_CPLUSPLUSFLAGS[arch=*]" = "$(OTHER_CFLAGS)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.brockton.MusicMedia;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -438,6 +475,8 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
+				"OTHER_CFLAGS[arch=*]" = "";
+				"OTHER_CPLUSPLUSFLAGS[arch=*]" = "$(OTHER_CFLAGS)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.brockton.MusicMedia;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -558,6 +597,56 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.9.0;
+			};
+		};
+		D349F2762D83CDA4002A29B9 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.3.0;
+			};
+		};
+		D349F2772D83CDD3002A29B9 /* XCRemoteSwiftPackageReference "SDWebImage" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/SDWebImage/SDWebImage.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.21.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		D349F40D2D850138002A29B9 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		D349F40F2D850138002A29B9 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		D349F4112D850138002A29B9 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		D349F4132D850138002A29B9 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D349EE062D839BD8002A29B9 /* Project object */;
 }
