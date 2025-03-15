@@ -2,95 +2,195 @@ import Foundation
 import MediaPlayer
 import Combine
 
-class MusicManager: NSObject, ObservableObject {
-    @Published var currentSong: Song?
-    @Published var isPlaying = false
-    @Published var playbackProgress: Double = 0
+protocol MusicService {
+    var currentTrack: Track? { get }
+    var playbackState: PlaybackState { get }
+    var isAuthorized: Bool { get }
     
-    private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
-    private var timer: Timer?
-    private var observers: [NSObjectProtocol] = []
+    func requestAuthorization() async
+    func play()
+    func pause()
+    func skipToNextItem()
+    func skipToPreviousItem()
+}
+
+struct Track {
+    let id: String
+    let title: String
+    let artist: String
+    let albumTitle: String?
+    let artwork: MPMediaItemArtwork?
+    let playbackDuration: TimeInterval
+    let source: MusicSource
+}
+
+enum MusicSource {
+    case appleMusic
+    case spotify
+    // Add more sources as needed
+}
+
+enum PlaybackState {
+    case playing
+    case paused
+    case stopped
+}
+
+@MainActor
+class MusicManager: NSObject, ObservableObject {
+    @Published var currentTrack: Track?
+    @Published var playbackState: PlaybackState = .stopped
+    @Published var isAuthorized = false
+    
+    private let appleMusicService: AppleMusicService
+    // private let spotifyService: SpotifyService // Future implementation
+    private var currentService: MusicService
     
     override init() {
+        self.appleMusicService = AppleMusicService()
+        self.currentService = appleMusicService
         super.init()
-        setupNotificationObservers()
-        setupPlaybackTimer()
-        updateNowPlaying()
+        checkAuthorization()
     }
     
-    deinit {
-        observers.forEach { NotificationCenter.default.removeObserver($0) }
-        timer?.invalidate()
+    func requestAuthorization() async {
+        await currentService.requestAuthorization()
     }
     
-    private func setupNotificationObservers() {
-        let playbackStateObserver = NotificationCenter.default.addObserver(
-            forName: .MPMusicPlayerControllerPlaybackStateDidChange,
-            object: musicPlayer,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handlePlaybackStateChange()
-        }
-        
-        let nowPlayingObserver = NotificationCenter.default.addObserver(
-            forName: .MPMusicPlayerControllerNowPlayingItemDidChange,
-            object: musicPlayer,
-            queue: .main
-        ) { [weak self] _ in
-            self?.updateNowPlaying()
-        }
-        
-        observers = [playbackStateObserver, nowPlayingObserver]
-        musicPlayer.beginGeneratingPlaybackNotifications()
+    private func checkAuthorization() {
+        isAuthorized = currentService.isAuthorized
     }
     
-    private func setupPlaybackTimer() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updatePlaybackProgress()
-        }
+    // MARK: - Playback Control
+    
+    func play() {
+        guard isAuthorized else { return }
+        currentService.play()
     }
     
-    private func handlePlaybackStateChange() {
-        isPlaying = musicPlayer.playbackState == .playing
+    func pause() {
+        guard isAuthorized else { return }
+        currentService.pause()
     }
     
-    private func updateNowPlaying() {
-        guard let mediaItem = musicPlayer.nowPlayingItem else {
-            currentSong = nil
-            return
-        }
-        currentSong = Song(from: mediaItem)
+    func skipToNextItem() {
+        guard isAuthorized else { return }
+        currentService.skipToNextItem()
     }
     
-    private func updatePlaybackProgress() {
-        guard isPlaying,
-              let duration = currentSong?.playbackDuration,
-              duration > 0 else {
-            return
-        }
-        
-        playbackProgress = musicPlayer.currentPlaybackTime / duration
+    func skipToPreviousItem() {
+        guard isAuthorized else { return }
+        currentService.skipToPreviousItem()
     }
     
-    // MARK: - Public Methods
+    // MARK: - Music Selection
     
-    func requestMusicAuthorization() async -> Bool {
-        let status = await MPMediaLibrary.requestAuthorization()
-        return status == .authorized
-    }
-    
-    func showMediaPicker() {
-        guard let rootViewController = UIApplication.shared.windows.first?.rootViewController else {
-            return
-        }
+    func showMusicPicker() {
+        guard isAuthorized else { return }
         
         let picker = MPMediaPickerController(mediaTypes: .music)
         picker.allowsPickingMultipleItems = true
         picker.showsCloudItems = true
-        picker.prompt = "Select songs to play"
-        picker.delegate = self
         
-        rootViewController.present(picker, animated: true)
+        // Note: The presentation of the picker needs to be handled by the view layer
+        // We'll add a delegate to handle the selection
+    }
+    
+    // MARK: - Track Information
+    
+    func getCurrentTrackInfo() -> (title: String, artist: String, artwork: MPMediaItemArtwork?)? {
+        guard isAuthorized, let track = currentTrack else { return nil }
+        return (
+            title: track.title,
+            artist: track.artist,
+            artwork: track.artwork
+        )
+    }
+}
+
+// MARK: - Apple Music Service Implementation
+class AppleMusicService: NSObject, MusicService {
+    private let musicPlayer = MPMusicPlayerController.systemMusicPlayer
+    private var nowPlayingObserver: NSObjectProtocol?
+    private var playbackStateObserver: NSObjectProtocol?
+    
+    var currentTrack: Track? {
+        guard let item = musicPlayer.nowPlayingItem else { return nil }
+        return Track(
+            id: item.persistentID.description,
+            title: item.title ?? "Unknown Title",
+            artist: item.artist ?? "Unknown Artist",
+            albumTitle: item.albumTitle,
+            artwork: item.artwork,
+            playbackDuration: item.playbackDuration,
+            source: .appleMusic
+        )
+    }
+    
+    var playbackState: PlaybackState {
+        switch musicPlayer.playbackState {
+        case .playing:
+            return .playing
+        case .paused:
+            return .paused
+        case .stopped, .interrupted, .seekingForward, .seekingBackward:
+            return .stopped
+        @unknown default:
+            return .stopped
+        }
+    }
+    
+    var isAuthorized: Bool {
+        MPMediaLibrary.authorizationStatus() == .authorized
+    }
+    
+    override init() {
+        super.init()
+        setupNotificationObservers()
+    }
+    
+    deinit {
+        if let observer = nowPlayingObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        if let observer = playbackStateObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+    }
+    
+    func requestAuthorization() async {
+        let status = await MPMediaLibrary.requestAuthorization()
+        if status == .authorized {
+            setupNotificationObservers()
+        }
+    }
+    
+    private func setupNotificationObservers() {
+        nowPlayingObserver = NotificationCenter.default.addObserver(
+            forName: .MPMusicPlayerControllerNowPlayingItemDidChange,
+            object: musicPlayer,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateNowPlayingItem()
+        }
+        
+        playbackStateObserver = NotificationCenter.default.addObserver(
+            forName: .MPMusicPlayerControllerPlaybackStateDidChange,
+            object: musicPlayer,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updatePlaybackState()
+        }
+        
+        musicPlayer.beginGeneratingPlaybackNotifications()
+    }
+    
+    private func updateNowPlayingItem() {
+        // Handle updates through the currentTrack property
+    }
+    
+    private func updatePlaybackState() {
+        // Handle updates through the playbackState property
     }
     
     func play() {
@@ -101,24 +201,19 @@ class MusicManager: NSObject, ObservableObject {
         musicPlayer.pause()
     }
     
-    func skipToNext() {
+    func skipToNextItem() {
         musicPlayer.skipToNextItem()
     }
     
-    func skipToPrevious() {
+    func skipToPreviousItem() {
         musicPlayer.skipToPreviousItem()
     }
 }
 
-// MARK: - MPMediaPickerControllerDelegate
-extension MusicManager: MPMediaPickerControllerDelegate {
-    func mediaPicker(_ mediaPicker: MPMediaPickerController, didPickMediaItems mediaItemCollection: MPMediaItemCollection) {
-        musicPlayer.setQueue(with: mediaItemCollection)
-        musicPlayer.play()
-        mediaPicker.dismiss(animated: true)
-    }
-    
-    func mediaPickerDidCancel(_ mediaPicker: MPMediaPickerController) {
-        mediaPicker.dismiss(animated: true)
-    }
-} 
+// Example of how a Spotify service would be implemented:
+/*
+class SpotifyService: MusicService {
+    // Implement Spotify SDK integration here
+}
+*/ 
+

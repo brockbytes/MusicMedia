@@ -12,22 +12,24 @@ class AuthManager: ObservableObject {
     private let auth = Auth.auth()
     private let db = Firestore.firestore()
     private var cancellables = Set<AnyCancellable>()
+    private var handle: AuthStateDidChangeListenerHandle?
     
     init() {
-        setupAuthStateListener()
+        handle = Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
+            if let firebaseUser = firebaseUser {
+                Task {
+                    try? await self?.fetchUserData(userId: firebaseUser.uid)
+                }
+            } else {
+                self?.currentUser = nil
+                self?.isAuthenticated = false
+            }
+        }
     }
     
-    private func setupAuthStateListener() {
-        auth.addStateDidChangeListener { [weak self] _, user in
-            Task {
-                if let firebaseUser = user {
-                    try? await self?.fetchUserData(userId: firebaseUser.uid)
-                    self?.isAuthenticated = true
-                } else {
-                    self?.currentUser = nil
-                    self?.isAuthenticated = false
-                }
-            }
+    deinit {
+        if let handle = handle {
+            Auth.auth().removeStateDidChangeListener(handle)
         }
     }
     
