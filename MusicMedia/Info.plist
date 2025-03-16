@@ -27,7 +27,7 @@
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>MusicMedia uses Bluetooth to discover nearby listeners and share music.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>MusicMedia needs to access your local network to discover nearby listeners.</string>
+	<string>MusicMedia uses your local network to discover and share music with nearby users.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>MusicMedia uses your location to find nearby music lovers and share music with people around you.</string>
 	<key>NSMicrophoneUsageDescription</key>
@@ -65,6 +65,11 @@
 	<array>
 		<string>PlayMusicIntent</string>
 		<string>SearchMusicIntent</string>
+	</array>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_music-media._tcp</string>
+		<string>_music-media._udp</string>
 	</array>
 </dict>
 </plist>

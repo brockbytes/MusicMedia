@@ -1,5 +1,6 @@
 import SwiftUI
 import MediaPlayer
+import MusicKit
 
 struct NowPlayingView: View {
     @EnvironmentObject var musicManager: MusicManager
@@ -8,11 +9,13 @@ struct NowPlayingView: View {
     var body: some View {
         NavigationView {
             VStack(spacing: 20) {
-                if musicManager.isAuthorized {
-                    if let track = musicManager.currentTrack {
+                if musicManager.authorizationStatus == .authorized {
+                    if let track = musicManager.currentSong {
                         // Artwork
-                        if let artwork = track.artwork {
-                            Image(uiImage: artwork.image(at: CGSize(width: 300, height: 300)) ?? UIImage())
+                        if let artworkURL = track.artworkURL,
+                           let artworkData = try? Data(contentsOf: artworkURL),
+                           let artwork = UIImage(data: artworkData) {
+                            Image(uiImage: artwork)
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 300, height: 300)
@@ -39,8 +42,8 @@ struct NowPlayingView: View {
                             
                             // Source indicator
                             HStack {
-                                Image(systemName: sourceIcon(for: track.source))
-                                Text(sourceLabel(for: track.source))
+                                Image(systemName: sourceIcon(for: .appleMusic))
+                                Text(sourceLabel(for: .appleMusic))
                             }
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -49,23 +52,33 @@ struct NowPlayingView: View {
                         
                         // Playback Controls
                         HStack(spacing: 40) {
-                            Button(action: { musicManager.skipToPreviousItem() }) {
+                            Button(action: {
+                                Task {
+                                    try? await SystemMusicPlayer.shared.skipToPreviousEntry()
+                                }
+                            }) {
                                 Image(systemName: "backward.fill")
                                     .font(.title)
                             }
                             
                             Button(action: {
-                                if musicManager.playbackState == .playing {
-                                    musicManager.pause()
-                                } else {
-                                    musicManager.play()
+                                Task {
+                                    if SystemMusicPlayer.shared.state.playbackStatus == .playing {
+                                        try? await SystemMusicPlayer.shared.pause()
+                                    } else {
+                                        try? await SystemMusicPlayer.shared.play()
+                                    }
                                 }
                             }) {
-                                Image(systemName: musicManager.playbackState == .playing ? "pause.fill" : "play.fill")
+                                Image(systemName: SystemMusicPlayer.shared.state.playbackStatus == .playing ? "pause.fill" : "play.fill")
                                     .font(.system(size: 45))
                             }
                             
-                            Button(action: { musicManager.skipToNextItem() }) {
+                            Button(action: {
+                                Task {
+                                    try? await SystemMusicPlayer.shared.skipToNextEntry()
+                                }
+                            }) {
                                 Image(systemName: "forward.fill")
                                     .font(.title)
                             }
@@ -115,7 +128,7 @@ struct NowPlayingView: View {
                     Button(action: { showingMusicPicker = true }) {
                         Image(systemName: "music.note.list")
                     }
-                    .disabled(!musicManager.isAuthorized)
+                    .disabled(musicManager.authorizationStatus != .authorized)
                 }
             }
         }
