@@ -9,12 +9,24 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         // Configure Firebase before doing anything else
         FirebaseApp.configure()
         
+        // Get Firebase Auth instance
+        let auth = Auth.auth()
+        
         // Add auth state listener to monitor sign-in status
-        Auth.auth().addStateDidChangeListener { (auth, user) in
+        auth.addStateDidChangeListener { [weak self] (auth, user) in
             if let user = user {
                 print("User is signed in with ID: \(user.uid)")
+                // Ensure user data is properly cached
+                UserDefaults.standard.set(user.uid, forKey: "lastSignedInUser")
+                
+                // Attempt to restore the user's session
+                if let currentUser = auth.currentUser {
+                    print("Current user session is valid")
+                    NotificationCenter.default.post(name: NSNotification.Name("UserSessionRestored"), object: nil, userInfo: ["userId": currentUser.uid])
+                }
             } else {
                 print("User is signed out")
+                UserDefaults.standard.removeObject(forKey: "lastSignedInUser")
             }
         }
         

@@ -6,7 +6,7 @@ import Combine
 @MainActor
 class AuthManager: ObservableObject {
     @Published var currentUser: User?
-    @Published var isAuthenticated = false
+    @Published var isAuthenticated: Bool
     @Published var authError: Error?
     
     private let auth = Auth.auth()
@@ -15,10 +15,48 @@ class AuthManager: ObservableObject {
     private var handle: AuthStateDidChangeListenerHandle?
     
     init() {
+        // Initialize with current auth state
+        self.isAuthenticated = auth.currentUser != nil
+        
+        if let currentUser = auth.currentUser {
+            // Fetch user data immediately
+            Task {
+                do {
+                    try await fetchUserData(userId: currentUser.uid)
+                } catch {
+                    print("Error fetching initial user data: \(error)")
+                    self.isAuthenticated = false
+                }
+            }
+        }
+        
+        setupAuthStateListener()
+        setupSessionRestorationListener()
+    }
+    
+    deinit {
+        if let handle = handle {
+            Auth.auth().removeStateDidChangeListener(handle)
+        }
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    private func setupAuthStateListener() {
         handle = Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
             if let firebaseUser = firebaseUser {
                 Task {
-                    try? await self?.fetchUserData(userId: firebaseUser.uid)
+                    do {
+                        try await self?.fetchUserData(userId: firebaseUser.uid)
+                        await MainActor.run {
+                            self?.isAuthenticated = true
+                        }
+                    } catch {
+                        print("Error fetching user data: \(error)")
+                        await MainActor.run {
+                            self?.currentUser = nil
+                            self?.isAuthenticated = false
+                        }
+                    }
                 }
             } else {
                 self?.currentUser = nil
@@ -27,9 +65,31 @@ class AuthManager: ObservableObject {
         }
     }
     
-    deinit {
-        if let handle = handle {
-            Auth.auth().removeStateDidChangeListener(handle)
+    private func setupSessionRestorationListener() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleSessionRestoration(_:)),
+            name: NSNotification.Name("UserSessionRestored"),
+            object: nil
+        )
+    }
+    
+    @objc private func handleSessionRestoration(_ notification: Notification) {
+        guard let userId = notification.userInfo?["userId"] as? String else { return }
+        
+        Task {
+            do {
+                try await fetchUserData(userId: userId)
+                await MainActor.run {
+                    self.isAuthenticated = true
+                }
+            } catch {
+                print("Error restoring user session: \(error)")
+                await MainActor.run {
+                    self.currentUser = nil
+                    self.isAuthenticated = false
+                }
+            }
         }
     }
     

@@ -19,17 +19,12 @@ struct MusicMediaApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if authManager.isAuthenticated {
-                MainTabView()
-                    .environmentObject(authManager)
-                    .environmentObject(musicManager)
-                    .environmentObject(locationManager)
-                    .environmentObject(notificationManager)
-                    .environmentObject(permissionsManager)
-            } else {
-                AuthView()
-                    .environmentObject(authManager)
-            }
+            ContentView()
+                .environmentObject(authManager)
+                .environmentObject(musicManager)
+                .environmentObject(locationManager)
+                .environmentObject(notificationManager)
+                .environmentObject(permissionsManager)
         }
     }
 }
