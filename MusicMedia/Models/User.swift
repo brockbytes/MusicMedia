@@ -16,6 +16,14 @@ struct User: Identifiable, Codable {
     var discoveryDistance: Double
     var notificationSettings: NotificationSettings
     
+    // Friend-related computed properties
+    var isFriend: Bool {
+        get { false } // TODO: Implement friend check logic
+    }
+    var friendRequestSent: Bool {
+        get { false } // TODO: Implement friend request check logic
+    }
+    
     enum ListeningPrivacy: String, Codable {
         case public_ = "public_"
         case friendsOnly = "friendsOnly"

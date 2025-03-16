@@ -10,7 +10,7 @@ class NearbyConnectionManager: NSObject, ObservableObject {
     
     // MultipeerConnectivity properties
     private let serviceType = "music-media"
-    private let myPeerId = MCPeerID(displayName: UIDevice.current.name)
+    private let myPeerId: MCPeerID
     private var session: MCSession
     private var serviceAdvertiser: MCNearbyServiceAdvertiser
     private var serviceBrowser: MCNearbyServiceBrowser
@@ -40,6 +40,16 @@ class NearbyConnectionManager: NSObject, ObservableObject {
     #endif
     
     override init() {
+        // Create a unique identifier for this device
+        let deviceName = UIDevice.current.name
+        #if targetEnvironment(simulator)
+        myPeerId = MCPeerID(displayName: "Simulator-\(deviceName)")
+        #else
+        myPeerId = MCPeerID(displayName: deviceName)
+        #endif
+        
+        print("🔍 Initializing NearbyConnectionManager with peer ID: \(myPeerId.displayName)")
+        
         session = MCSession(peer: myPeerId, securityIdentity: nil, encryptionPreference: .required)
         
         serviceAdvertiser = MCNearbyServiceAdvertiser(peer: myPeerId,
@@ -57,6 +67,8 @@ class NearbyConnectionManager: NSObject, ObservableObject {
         
         startServices()
         setupNotifications()
+        
+        print("✅ NearbyConnectionManager initialized and services started")
     }
     
     private func setupNotifications() {
@@ -112,10 +124,15 @@ class NearbyConnectionManager: NSObject, ObservableObject {
     }
     
     private func startServices() {
-        print("NearbyConnectionManager: Starting advertising and browsing")
+        print("🚀 Starting nearby services...")
+        print("📡 Starting advertising as: \(myPeerId.displayName)")
         serviceAdvertiser.startAdvertisingPeer()
+        
+        print("🔍 Starting browsing for peers")
         serviceBrowser.startBrowsingForPeers()
+        
         startHeartbeat()
+        print("✅ All services started")
     }
     
     private func startHeartbeat() {
@@ -152,7 +169,6 @@ class NearbyConnectionManager: NSObject, ObservableObject {
     }
     
     private func handleConnectionFailure() {
-        guard !isSimulator else { return }
         let currentTime = Date()
         
         // Check each peer individually
@@ -184,17 +200,19 @@ class NearbyConnectionManager: NSObject, ObservableObject {
     }
     
     func updateCurrentSong(_ song: Song?) {
-        guard !isSimulator else {
-            print("Simulator: Skipping song update")
-            return
-        }
-        
+        print("🎵 Updating current song: \(song?.title ?? "nil")")
         currentSong = song
+        
+        // Allow simulator to receive songs but only real devices send song updates
+        #if targetEnvironment(simulator)
+        print("📱 Running in simulator - will receive songs but not send them")
+        #else
+        print("📡 Broadcasting song update to \(connectedPeers.count) peers")
         sendSongUpdate()
+        #endif
     }
     
     private func sendSongUpdate() {
-        guard !isSimulator else { return }
         guard let songData = try? JSONEncoder().encode(currentSong) else {
             print("❌ Failed to encode song")
             return
@@ -202,8 +220,10 @@ class NearbyConnectionManager: NSObject, ObservableObject {
         
         for peer in session.connectedPeers {
             do {
+                print("📤 Sending song update to peer: \(peer.displayName)")
                 try session.send(songData, toPeers: [peer], with: .reliable)
                 updateLastSuccessfulSendTime(for: peer)
+                print("✅ Successfully sent song update to: \(peer.displayName)")
             } catch {
                 print("❌ Failed to send song to \(peer.displayName): \(error)")
                 handleConnectionFailure()
@@ -275,47 +295,61 @@ class NearbyConnectionManager: NSObject, ObservableObject {
 extension NearbyConnectionManager: MCSessionDelegate {
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
         Task { @MainActor in
+            print("👥 Peer \(peerID.displayName) state changed to: \(state.description)")
             switch state {
             case .connected:
                 if !connectedPeers.contains(peerID) {
                     connectedPeers.append(peerID)
-                    print("✅ Peer connected: \(peerID.displayName)")
+                    print("✅ Successfully connected to peer: \(peerID.displayName)")
                     resetReconnectionAttempts(for: peerID)
+                    
+                    // Only send current song if we're not in simulator
+                    #if !targetEnvironment(simulator)
                     if let songData = try? JSONEncoder().encode(currentSong) {
+                        print("📤 Sending current song to newly connected peer")
                         try? session.send(songData, toPeers: [peerID], with: .reliable)
                     }
+                    #endif
                 }
             case .notConnected:
                 print("⚠️ Peer disconnected: \(peerID.displayName)")
-                // Initialize reconnection attempts if not already set
                 if reconnectionAttempts[peerID] == nil {
                     reconnectionAttempts[peerID] = 0
                 }
-                // Start reconnection attempts while keeping the song displayed
                 Task {
                     await attemptReconnectionWithPeer(peerID)
                 }
             case .connecting:
-                print("🔄 Peer connecting: \(peerID.displayName)")
+                print("🔄 Establishing connection with peer: \(peerID.displayName)")
             @unknown default:
-                break
+                print("❓ Unknown connection state for peer: \(peerID.displayName)")
             }
         }
     }
     
     func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
         Task { @MainActor in
-            if let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-               dict["type"] as? String == "heartbeat" {
-                lastHeartbeatTime = Date()
-                return
-            }
+            print("📥 Received data from peer: \(peerID.displayName)")
             
-            if let song = try? JSONDecoder().decode(Song.self, from: data) {
+            do {
+                if let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   dict["type"] as? String == "heartbeat" {
+                    print("💓 Received heartbeat from: \(peerID.displayName)")
+                    lastHeartbeatTime = Date()
+                    return
+                }
+                
+                let song = try JSONDecoder().decode(Song.self, from: data)
+                print("🎵 Received song update from \(peerID.displayName): \(song.title)")
                 nearbyUsers[peerID.displayName] = song
                 updateLastSuccessfulSendTime(for: peerID)
-            } else {
-                print("❌ Failed to decode song data from \(peerID.displayName)")
+                print("📊 Current nearby users count: \(nearbyUsers.count)")
+                print("🎵 Current nearby songs: \(nearbyUsers.map { "\($0.key): \($0.value.title)" }.joined(separator: ", "))")
+            } catch {
+                print("❌ Error processing data from \(peerID.displayName): \(error)")
+                if let str = String(data: data, encoding: .utf8) {
+                    print("📝 Received data as string: \(str)")
+                }
             }
         }
     }
@@ -328,13 +362,13 @@ extension NearbyConnectionManager: MCSessionDelegate {
 // MARK: - MCNearbyServiceAdvertiserDelegate
 extension NearbyConnectionManager: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        print("NearbyConnectionManager: Received invitation from peer: \(peerID.displayName)")
-        // Auto-accept connections
+        print("📨 Received invitation from peer: \(peerID.displayName)")
         invitationHandler(true, session)
+        print("✅ Automatically accepted invitation from: \(peerID.displayName)")
     }
     
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
-        print("NearbyConnectionManager: Failed to start advertising: \(error)")
+        print("❌ Failed to start advertising: \(error.localizedDescription)")
     }
 }
 
@@ -342,23 +376,32 @@ extension NearbyConnectionManager: MCNearbyServiceAdvertiserDelegate {
 extension NearbyConnectionManager: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
         print("✨ Found peer: \(peerID.displayName)")
+        print("📨 Sending invitation to peer: \(peerID.displayName)")
         browser.invitePeer(peerID, to: session, withContext: nil, timeout: 10)
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
         print("⚠️ Lost sight of peer: \(peerID.displayName)")
-        // Instead of immediately clearing, start reconnection process
         Task { @MainActor in
-            // Initialize reconnection attempts if not already set
             if reconnectionAttempts[peerID] == nil {
                 reconnectionAttempts[peerID] = 0
             }
-            // Try to reconnect while keeping the song displayed
             await attemptReconnectionWithPeer(peerID)
         }
     }
     
     func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
-        print("❌ Failed to start browsing: \(error)")
+        print("❌ Failed to start browsing: \(error.localizedDescription)")
+    }
+}
+
+private extension MCSessionState {
+    var description: String {
+        switch self {
+        case .notConnected: return "Not Connected"
+        case .connecting: return "Connecting"
+        case .connected: return "Connected"
+        @unknown default: return "Unknown"
+        }
     }
 } 

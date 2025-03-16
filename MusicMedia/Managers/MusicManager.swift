@@ -7,6 +7,7 @@ import Combine
 class MusicManager: ObservableObject {
     @Published private(set) var currentSong: Song?
     @Published private(set) var authorizationStatus: MusicAuthorization.Status = .notDetermined
+    @Published private(set) var isPlaying: Bool = false
     
     private var timer: Timer?
     private let musicPlayer = SystemMusicPlayer.shared
@@ -26,7 +27,7 @@ class MusicManager: ObservableObject {
                 await requestMusicAuthorization()
                 await setupMusicPlayer()
             } else {
-                print("Running in simulator - music features disabled")
+                print("Running in simulator - music playback disabled but nearby connections enabled")
                 authorizationStatus = .authorized // Mock authorization for UI testing
             }
         }
@@ -53,11 +54,13 @@ class MusicManager: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { [weak self] in
                 await self?.checkCurrentSong()
+                await self?.updatePlaybackState()
             }
         }
         
         Task {
             await checkCurrentSong()
+            await updatePlaybackState()
         }
     }
     
@@ -135,6 +138,32 @@ class MusicManager: ObservableObject {
     
     deinit {
         timer?.invalidate()
+    }
+    
+    // MARK: - Playback Control Methods
+    
+    func togglePlayPause() async throws {
+        if musicPlayer.state.playbackStatus == .playing {
+            try await musicPlayer.pause()
+        } else {
+            try await musicPlayer.play()
+        }
+        await updatePlaybackState()
+    }
+    
+    func skipToNext() async throws {
+        try await musicPlayer.skipToNextEntry()
+        await updatePlaybackState()
+    }
+    
+    func skipToPrevious() async throws {
+        try await musicPlayer.skipToPreviousEntry()
+        await updatePlaybackState()
+    }
+    
+    private func updatePlaybackState() async {
+        isPlaying = musicPlayer.state.playbackStatus == .playing
+        await checkCurrentSong()
     }
 }
 

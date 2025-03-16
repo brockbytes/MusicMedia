@@ -151,6 +151,151 @@ class AuthManager: ObservableObject {
         }
         currentUser = try Firestore.Decoder().decode(User.self, from: data)
     }
+    
+    // MARK: - Profile Management
+    
+    func updateUserData(displayName: String, username: String, bio: String?, profileImageUrl: String?) async throws {
+        guard let userId = auth.currentUser?.uid else {
+            throw AuthError.userDataNotFound
+        }
+        
+        // Check if the new username is available (if it's different from current)
+        if let currentUser = currentUser, username != currentUser.username {
+            let snapshot = try await db.collection("users")
+                .whereField("username", isEqualTo: username)
+                .getDocuments()
+            
+            guard snapshot.documents.isEmpty else {
+                throw AuthError.usernameAlreadyExists
+            }
+        }
+        
+        // Update the user document
+        var updateData: [String: Any] = [
+            "displayName": displayName,
+            "username": username
+        ]
+        
+        if let bio = bio {
+            updateData["bio"] = bio
+        }
+        
+        if let profileImageUrl = profileImageUrl {
+            updateData["profileImageUrl"] = profileImageUrl
+        }
+        
+        try await db.collection("users").document(userId).updateData(updateData)
+        
+        // Fetch updated user data
+        try await fetchUserData(userId: userId)
+    }
+    
+    // MARK: - Friend Management
+    
+    func searchUsers(matching query: String) async throws -> [User] {
+        guard !query.isEmpty else { return [] }
+        
+        let usersRef = db.collection("users")
+        let querySnapshot = try await usersRef
+            .whereField("username", isGreaterThanOrEqualTo: query)
+            .whereField("username", isLessThan: query + "\u{f8ff}")
+            .limit(to: 20)
+            .getDocuments()
+        
+        return try querySnapshot.documents.compactMap { document in
+            try document.data(as: User.self)
+        }
+    }
+    
+    func sendFriendRequest(to user: User) async throws {
+        guard let currentUserId = auth.currentUser?.uid,
+              let targetUserId = user.id else {
+            throw AuthError.userDataNotFound
+        }
+        
+        // Create friend request document
+        let requestData: [String: Any] = [
+            "fromUserId": currentUserId,
+            "toUserId": targetUserId,
+            "status": "pending",
+            "timestamp": Timestamp()
+        ]
+        
+        try await db.collection("friendRequests").addDocument(data: requestData)
+    }
+    
+    func acceptFriendRequest(from userId: String) async throws {
+        guard let currentUserId = auth.currentUser?.uid else {
+            throw AuthError.userDataNotFound
+        }
+        
+        // Update friend request status
+        let requestSnapshot = try await db.collection("friendRequests")
+            .whereField("fromUserId", isEqualTo: userId)
+            .whereField("toUserId", isEqualTo: currentUserId)
+            .whereField("status", isEqualTo: "pending")
+            .getDocuments()
+        
+        guard let requestDoc = requestSnapshot.documents.first else {
+            throw AuthError.unknown
+        }
+        
+        // Update request status
+        try await requestDoc.reference.updateData(["status": "accepted"])
+        
+        // Add users to each other's friends lists
+        let batch = db.batch()
+        let currentUserRef = db.collection("users").document(currentUserId)
+        let otherUserRef = db.collection("users").document(userId)
+        
+        batch.updateData([
+            "following": FieldValue.arrayUnion([userId])
+        ], forDocument: currentUserRef)
+        
+        batch.updateData([
+            "followers": FieldValue.arrayUnion([currentUserId])
+        ], forDocument: otherUserRef)
+        
+        try await batch.commit()
+    }
+    
+    func rejectFriendRequest(from userId: String) async throws {
+        guard let currentUserId = auth.currentUser?.uid else {
+            throw AuthError.userDataNotFound
+        }
+        
+        let requestSnapshot = try await db.collection("friendRequests")
+            .whereField("fromUserId", isEqualTo: userId)
+            .whereField("toUserId", isEqualTo: currentUserId)
+            .whereField("status", isEqualTo: "pending")
+            .getDocuments()
+        
+        guard let requestDoc = requestSnapshot.documents.first else {
+            throw AuthError.unknown
+        }
+        
+        try await requestDoc.reference.updateData(["status": "rejected"])
+    }
+    
+    func removeFriend(_ userId: String) async throws {
+        guard let currentUserId = auth.currentUser?.uid else {
+            throw AuthError.userDataNotFound
+        }
+        
+        let batch = db.batch()
+        let currentUserRef = db.collection("users").document(currentUserId)
+        let otherUserRef = db.collection("users").document(userId)
+        
+        batch.updateData([
+            "following": FieldValue.arrayRemove([userId])
+        ], forDocument: currentUserRef)
+        
+        batch.updateData([
+            "followers": FieldValue.arrayRemove([currentUserId])
+        ], forDocument: otherUserRef)
+        
+        try await batch.commit()
+    }
 }
 
 enum AuthError: LocalizedError {
