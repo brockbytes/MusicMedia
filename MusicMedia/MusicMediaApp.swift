@@ -6,7 +6,8 @@
 //
 
 import SwiftUI
-import Firebase
+import FirebaseCore
+import FirebaseStorage
 
 @main
 struct MusicMediaApp: App {
@@ -19,27 +20,33 @@ struct MusicMediaApp: App {
     
     var body: some Scene {
         WindowGroup {
-            ZStack(alignment: .bottom) {
-                TabView {
-                    NearbyView()
-                        .tabItem {
-                            Label("Nearby", systemImage: "wave.3.right")
+            Group {
+                if authManager.isAuthenticated {
+                    ZStack(alignment: .bottom) {
+                        TabView {
+                            NearbyView()
+                                .tabItem {
+                                    Label("Nearby", systemImage: "wave.3.right")
+                                }
+                            
+                            FriendsView()
+                                .tabItem {
+                                    Label("Friends", systemImage: "person.2")
+                                }
+                            
+                            ProfileView()
+                                .tabItem {
+                                    Label("Profile", systemImage: "person.circle")
+                                }
                         }
-                    
-                    FriendsView()
-                        .tabItem {
-                            Label("Friends", systemImage: "person.2")
+                        
+                        VStack(spacing: 0) {
+                            MiniPlayerView()
+                            Spacer().frame(height: 49) // Height of tab bar
                         }
-                    
-                    ProfileView()
-                        .tabItem {
-                            Label("Profile", systemImage: "person.circle")
-                        }
-                }
-                
-                VStack(spacing: 0) {
-                    MiniPlayerView()
-                    Spacer().frame(height: 49) // Height of tab bar
+                    }
+                } else {
+                    AuthView()
                 }
             }
             .environmentObject(authManager)

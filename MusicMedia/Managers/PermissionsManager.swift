@@ -5,6 +5,7 @@ import UserNotifications
 import AVFoundation
 import UIKit
 import CoreBluetooth
+import Photos
 
 enum PermissionType: String, CaseIterable {
     case music = "Media & Apple Music"
@@ -15,6 +16,7 @@ enum PermissionType: String, CaseIterable {
     case siri = "Siri & Search"
     case bluetooth = "Bluetooth"
     case localNetwork = "Local Network"
+    case photoLibrary = "Photo Library"
 }
 
 enum PermissionStatus {
@@ -52,6 +54,7 @@ class PermissionsManager: NSObject, ObservableObject, CLLocationManagerDelegate,
                 group.addTask { await self.updateBackgroundRefreshStatus() }
                 group.addTask { await self.updateBluetoothStatus() }
                 group.addTask { await self.updateLocalNetworkStatus() }
+                group.addTask { await self.updatePhotoLibraryStatus() }
             }
         }
     }
@@ -113,6 +116,13 @@ class PermissionsManager: NSObject, ObservableObject, CLLocationManagerDelegate,
         }
     }
     
+    private func updatePhotoLibraryStatus() async {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        await MainActor.run {
+            permissionStatuses[.photoLibrary] = convertPHAuthorizationStatus(status)
+        }
+    }
+    
     // MARK: - Permission Requests
     
     /// Request music library access. Call this when user tries to access music features.
@@ -161,6 +171,17 @@ class PermissionsManager: NSObject, ObservableObject, CLLocationManagerDelegate,
         return status == .granted
     }
     
+    /// Request photo library access. Call this when user tries to access photo features.
+    func requestPhotoLibraryPermissionIfNeeded() async -> Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        if status == .notDetermined {
+            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            await updatePhotoLibraryStatus()
+            return newStatus == .authorized
+        }
+        return status == .authorized
+    }
+    
     /// Request permission for a specific type
     func requestPermission(_ type: PermissionType) async {
         switch type {
@@ -172,6 +193,8 @@ class PermissionsManager: NSObject, ObservableObject, CLLocationManagerDelegate,
             _ = await requestNotificationPermissionIfNeeded()
         case .microphone:
             _ = await requestMicrophonePermissionIfNeeded()
+        case .photoLibrary:
+            _ = await requestPhotoLibraryPermissionIfNeeded()
         case .backgroundRefresh:
             // Background refresh permission is not managed by this manager
             break
@@ -270,6 +293,16 @@ class PermissionsManager: NSObject, ObservableObject, CLLocationManagerDelegate,
             return .authorized
         @unknown default:
             return .denied
+        }
+    }
+    
+    private func convertPHAuthorizationStatus(_ status: PHAuthorizationStatus) -> PermissionStatus {
+        switch status {
+        case .notDetermined: return .notDetermined
+        case .authorized, .limited: return .authorized
+        case .denied: return .denied
+        case .restricted: return .restricted
+        @unknown default: return .denied
         }
     }
     

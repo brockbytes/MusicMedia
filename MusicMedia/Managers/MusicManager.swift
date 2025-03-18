@@ -165,5 +165,13 @@ class MusicManager: ObservableObject {
         isPlaying = musicPlayer.state.playbackStatus == .playing
         await checkCurrentSong()
     }
+    
+    func stopPlayback() {
+        musicPlayer.stop()
+        currentSong = nil
+        isPlaying = false
+        timer?.invalidate()
+        timer = nil
+    }
 }
 

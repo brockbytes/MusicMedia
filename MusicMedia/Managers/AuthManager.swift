@@ -42,16 +42,33 @@ class AuthManager: ObservableObject {
     }
     
     private func setupAuthStateListener() {
-        handle = Auth.auth().addStateDidChangeListener { [weak self] _, firebaseUser in
+        handle = Auth.auth().addStateDidChangeListener { [weak self] (auth, firebaseUser) in
             if let firebaseUser = firebaseUser {
+                print("🔐 Auth state changed - User signed in with ID: \(firebaseUser.uid)")
                 Task {
                     do {
-                        try await self?.fetchUserData(userId: firebaseUser.uid)
+                        // Set authenticated to false while we fetch user data
                         await MainActor.run {
-                            self?.isAuthenticated = true
+                            self?.isAuthenticated = false
+                        }
+                        
+                        try await self?.fetchUserData(userId: firebaseUser.uid)
+                        
+                        // Verify user data was loaded
+                        if self?.currentUser != nil {
+                            print("✅ Successfully loaded user data after auth state change")
+                            await MainActor.run {
+                                self?.isAuthenticated = true
+                            }
+                        } else {
+                            print("❌ Failed to load user data after auth state change")
+                            await MainActor.run {
+                                self?.currentUser = nil
+                                self?.isAuthenticated = false
+                            }
                         }
                     } catch {
-                        print("Error fetching user data: \(error)")
+                        print("❌ Error fetching user data after auth state change: \(error)")
                         await MainActor.run {
                             self?.currentUser = nil
                             self?.isAuthenticated = false
@@ -59,6 +76,7 @@ class AuthManager: ObservableObject {
                     }
                 }
             } else {
+                print("🔐 Auth state changed - User signed out")
                 self?.currentUser = nil
                 self?.isAuthenticated = false
             }
@@ -75,16 +93,48 @@ class AuthManager: ObservableObject {
     }
     
     @objc private func handleSessionRestoration(_ notification: Notification) {
-        guard let userId = notification.userInfo?["userId"] as? String else { return }
+        guard let userId = notification.userInfo?["userId"] as? String else {
+            print("❌ Session restoration failed - No user ID provided")
+            return
+        }
+        
+        print("🔄 Attempting to restore session for user: \(userId)")
         
         Task {
             do {
-                try await fetchUserData(userId: userId)
+                // Set authenticated to false while we restore the session
                 await MainActor.run {
-                    self.isAuthenticated = true
+                    self.isAuthenticated = false
+                }
+                
+                // Verify the Firebase user is still valid
+                guard let firebaseUser = Auth.auth().currentUser,
+                      firebaseUser.uid == userId else {
+                    print("❌ Session restoration failed - Firebase user is invalid")
+                    await MainActor.run {
+                        self.currentUser = nil
+                        self.isAuthenticated = false
+                    }
+                    return
+                }
+                
+                try await fetchUserData(userId: userId)
+                
+                // Verify user data was loaded
+                if currentUser != nil {
+                    print("✅ Successfully restored session")
+                    await MainActor.run {
+                        self.isAuthenticated = true
+                    }
+                } else {
+                    print("❌ Session restoration failed - Could not load user data")
+                    await MainActor.run {
+                        self.currentUser = nil
+                        self.isAuthenticated = false
+                    }
                 }
             } catch {
-                print("Error restoring user session: \(error)")
+                print("❌ Error restoring session: \(error)")
                 await MainActor.run {
                     self.currentUser = nil
                     self.isAuthenticated = false
@@ -125,7 +175,20 @@ class AuthManager: ObservableObject {
     func signIn(email: String, password: String) async throws {
         do {
             let result = try await auth.signIn(withEmail: email, password: password)
+            // Ensure user data is fetched before marking as authenticated
             try await fetchUserData(userId: result.user.uid)
+            
+            // Double check that the user data was properly loaded
+            guard currentUser != nil else {
+                throw AuthError.userDataNotFound
+            }
+            
+            print("✅ Successfully signed in and loaded user data")
+            print("👤 Current user state:")
+            print("👤 - User ID: \(result.user.uid)")
+            print("👤 - Display Name: \(currentUser?.displayName ?? "nil")")
+            print("👤 - Username: \(currentUser?.username ?? "nil")")
+            
             isAuthenticated = true
         } catch {
             authError = error
@@ -133,23 +196,50 @@ class AuthManager: ObservableObject {
         }
     }
     
-    func signOut() throws {
+    func signOut() async throws {
         do {
-            try auth.signOut()
+            // Clear user data first
             currentUser = nil
             isAuthenticated = false
+            UserDefaults.standard.removeObject(forKey: "lastSignedInUser")
+            
+            // Sign out from Firebase
+            try auth.signOut()
+            
+            print("👋 User signed out successfully")
         } catch {
+            print("❌ Error signing out: \(error)")
             authError = error
             throw error
         }
     }
     
     private func fetchUserData(userId: String) async throws {
-        let documentSnapshot = try await db.collection("users").document(userId).getDocument()
-        guard let data = documentSnapshot.data() else {
-            throw AuthError.userDataNotFound
+        print("👤 Fetching user data for userId: \(userId)")
+        do {
+            let documentSnapshot = try await db.collection("users").document(userId).getDocument()
+            guard let data = documentSnapshot.data() else {
+                print("❌ No user data found for userId: \(userId)")
+                throw AuthError.userDataNotFound
+            }
+            print("👤 Successfully retrieved user data from Firestore")
+            print("👤 Raw user data: \(data)")
+            
+            let decoder = Firestore.Decoder()
+            var user = try decoder.decode(User.self, from: data)
+            // Explicitly set the document ID since @DocumentID might not be working correctly
+            user.id = userId
+            currentUser = user
+            
+            print("👤 Successfully decoded user data:")
+            print("👤 - User ID: \(currentUser?.id ?? "nil")")
+            print("👤 - Display Name: \(currentUser?.displayName ?? "nil")")
+            print("👤 - Username: \(currentUser?.username ?? "nil")")
+            print("👤 - Profile Image URL: \(currentUser?.profileImageUrl ?? "nil")")
+        } catch {
+            print("❌ Error fetching user data: \(error)")
+            throw error
         }
-        currentUser = try Firestore.Decoder().decode(User.self, from: data)
     }
     
     // MARK: - Profile Management
@@ -188,6 +278,31 @@ class AuthManager: ObservableObject {
         
         // Fetch updated user data
         try await fetchUserData(userId: userId)
+    }
+    
+    func updateUserProfile(fields: [String: Any]) async throws {
+        guard let userId = Auth.auth().currentUser?.uid else {
+            print("❌ No authenticated user found when trying to update profile")
+            throw NSError(domain: "AuthManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "No authenticated user"])
+        }
+        
+        print("👤 Updating user profile for userId: \(userId)")
+        print("👤 Fields to update: \(fields)")
+        
+        do {
+            try await db.collection("users").document(userId).updateData(fields)
+            print("👤 Successfully updated user profile in Firestore")
+            
+            // Fetch the updated user data
+            try await fetchUserData(userId: userId)
+            print("👤 Profile update complete. Current user state:")
+            print("👤 - Display Name: \(currentUser?.displayName ?? "nil")")
+            print("👤 - Username: \(currentUser?.username ?? "nil")")
+            print("👤 - Profile Image URL: \(currentUser?.profileImageUrl ?? "nil")")
+        } catch {
+            print("❌ Error updating user profile: \(error)")
+            throw error
+        }
     }
     
     // MARK: - Friend Management
@@ -295,6 +410,10 @@ class AuthManager: ObservableObject {
         ], forDocument: otherUserRef)
         
         try await batch.commit()
+    }
+    
+    func refreshUserData(userId: String) async throws {
+        try await fetchUserData(userId: userId)
     }
 }
 

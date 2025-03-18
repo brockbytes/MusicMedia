@@ -12,6 +12,8 @@
 		D349F4102D850138002A29B9 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = D349F40F2D850138002A29B9 /* FirebaseAuth */; };
 		D349F4122D850138002A29B9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = D349F4112D850138002A29B9 /* FirebaseFirestore */; };
 		D349F4142D850138002A29B9 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = D349F4132D850138002A29B9 /* FirebaseStorage */; };
+		D349F51D2D890B9C002A29B9 /* CropViewController in Frameworks */ = {isa = PBXBuildFile; productRef = D349F51C2D890B9C002A29B9 /* CropViewController */; };
+		D349F51F2D890B9C002A29B9 /* TOCropViewController in Frameworks */ = {isa = PBXBuildFile; productRef = D349F51E2D890B9C002A29B9 /* TOCropViewController */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -76,9 +78,11 @@
 			files = (
 				D349F40E2D850138002A29B9 /* FirebaseAnalytics in Frameworks */,
 				D349F4122D850138002A29B9 /* FirebaseFirestore in Frameworks */,
+				D349F51F2D890B9C002A29B9 /* TOCropViewController in Frameworks */,
 				D349F4102D850138002A29B9 /* FirebaseAuth in Frameworks */,
 				D349F4142D850138002A29B9 /* FirebaseStorage in Frameworks */,
 				D349EFFE2D83BFD0002A29B9 /* MediaPlayer.framework in Frameworks */,
+				D349F51D2D890B9C002A29B9 /* CropViewController in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -229,6 +233,7 @@
 				D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				D349F2762D83CDA4002A29B9 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				D349F2772D83CDD3002A29B9 /* XCRemoteSwiftPackageReference "SDWebImage" */,
+				D349F51B2D890B9C002A29B9 /* XCRemoteSwiftPackageReference "TOCropViewController" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = D349EE0F2D839BD8002A29B9 /* Products */;
@@ -627,6 +632,14 @@
 				minimumVersion = 5.21.0;
 			};
 		};
+		D349F51B2D890B9C002A29B9 /* XCRemoteSwiftPackageReference "TOCropViewController" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/TimOliver/TOCropViewController.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.7.4;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -649,6 +662,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D349F2752D83CD6E002A29B9 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
+		};
+		D349F51C2D890B9C002A29B9 /* CropViewController */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D349F51B2D890B9C002A29B9 /* XCRemoteSwiftPackageReference "TOCropViewController" */;
+			productName = CropViewController;
+		};
+		D349F51E2D890B9C002A29B9 /* TOCropViewController */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D349F51B2D890B9C002A29B9 /* XCRemoteSwiftPackageReference "TOCropViewController" */;
+			productName = TOCropViewController;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

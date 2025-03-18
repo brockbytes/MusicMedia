@@ -3,110 +3,171 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject var permissionsManager: PermissionsManager
     @EnvironmentObject var authManager: AuthManager
+    @EnvironmentObject var musicManager: MusicManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var showingEditProfile = false
+    @State private var errorMessage: String?
+    @State private var showError = false
+    @State private var isSigningOut = false
     
     var body: some View {
-        NavigationView {
-            List {
-                Section("Permissions") {
-                    ForEach(PermissionType.allCases, id: \.self) { permission in
-                        PermissionRow(type: permission)
+        List {
+            // Profile Section
+            Section("Profile") {
+                Button {
+                    showingEditProfile = true
+                } label: {
+                    HStack {
+                        Text("Edit Profile")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .foregroundColor(.primary)
+                
+                NavigationLink {
+                    PermissionsView()
+                } label: {
+                    HStack {
+                        Text("Photo Library Access")
+                        Spacer()
+                        Text(permissionsManager.permissionStatuses[.photoLibrary]?.displayText ?? "Not Set")
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            // Music Settings
+            Section("Music") {
+                NavigationLink {
+                    PermissionsView()
+                } label: {
+                    HStack {
+                        Text("Music Library Access")
+                        Spacer()
+                        Text(permissionsManager.permissionStatuses[.music]?.displayText ?? "Not Set")
+                            .foregroundColor(.secondary)
                     }
                 }
                 
-                Section("Account") {
-                    Button(role: .destructive) {
-                        Task {
-                            do {
-                                try await authManager.signOut()
-                            } catch {
-                                print("Error signing out: \(error)")
+                Toggle("Show Mini Player", isOn: .constant(true))
+                    .tint(.accentColor)
+            }
+            
+            // Nearby Settings
+            Section("Nearby") {
+                NavigationLink {
+                    PermissionsView()
+                } label: {
+                    HStack {
+                        Text("Location Access")
+                        Spacer()
+                        Text(permissionsManager.permissionStatuses[.location]?.displayText ?? "Not Set")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Toggle("Visible to Nearby Users", isOn: .constant(true))
+                    .tint(.accentColor)
+            }
+            
+            // Notifications
+            Section("Notifications") {
+                NavigationLink {
+                    PermissionsView()
+                } label: {
+                    HStack {
+                        Text("Push Notifications")
+                        Spacer()
+                        Text(permissionsManager.permissionStatuses[.notifications]?.displayText ?? "Not Set")
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Toggle("Friend Requests", isOn: .constant(true))
+                    .tint(.accentColor)
+                
+                Toggle("Now Playing Updates", isOn: .constant(true))
+                    .tint(.accentColor)
+            }
+            
+            // Privacy
+            Section("Privacy") {
+                Toggle("Share Listening Activity", isOn: .constant(true))
+                    .tint(.accentColor)
+                
+                Toggle("Allow Friend Requests", isOn: .constant(true))
+                    .tint(.accentColor)
+            }
+            
+            // Account
+            Section {
+                Button(role: .destructive) {
+                    isSigningOut = true
+                    Task {
+                        do {
+                            // Clear any cached data
+                            UserDefaults.standard.synchronize()
+                            // Sign out
+                            try await authManager.signOut()
+                            await MainActor.run {
+                                isSigningOut = false
+                                dismiss() // This will dismiss the settings sheet
+                            }
+                        } catch {
+                            print("❌ Error signing out: \(error)")
+                            await MainActor.run {
+                                isSigningOut = false
+                                errorMessage = error.localizedDescription
+                                showError = true
                             }
                         }
-                    } label: {
+                    }
+                } label: {
+                    if isSigningOut {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                            Spacer()
+                        }
+                    } else {
                         Text("Sign Out")
                     }
                 }
-            }
-            .navigationTitle("Settings")
-        }
-    }
-}
-
-struct PermissionRow: View {
-    @EnvironmentObject var permissionsManager: PermissionsManager
-    let type: PermissionType
-    
-    var body: some View {
-        Button(action: {
-            handlePermissionTap()
-        }) {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(type.rawValue)
-                        .font(.body)
-                    Text(statusDescription)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                if let status = permissionsManager.permissionStatuses[type] {
-                    switch status {
-                    case .authorized:
-                        Image(systemName: "checkmark")
-                            .foregroundColor(.green)
-                    case .denied, .restricted:
-                        Text("Off")
-                            .foregroundColor(.secondary)
-                    case .notDetermined:
-                        Text("Off")
-                            .foregroundColor(.secondary)
-                    }
-                }
+                .disabled(isSigningOut)
             }
         }
-        .foregroundColor(.primary)
-    }
-    
-    private func handlePermissionTap() {
-        guard let status = permissionsManager.permissionStatuses[type] else { return }
-        
-        switch status {
-        case .notDetermined:
-            // Try to request permission first if not determined
-            Task {
-                await permissionsManager.requestPermission(type)
-            }
-        case .denied, .restricted:
-            // If denied or restricted, open system settings
-            permissionsManager.openSettings()
-        case .authorized:
-            // If already authorized, just open system settings
-            permissionsManager.openSettings()
+        .sheet(isPresented: $showingEditProfile) {
+            EditProfileView()
         }
-    }
-    
-    private var statusDescription: String {
-        guard let status = permissionsManager.permissionStatuses[type] else {
-            return ""
+        .alert("Error", isPresented: $showError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred")
         }
-        
-        switch status {
-        case .notDetermined:
-            return "Access not determined"
-        case .authorized:
-            return "Access granted"
-        case .denied:
-            return "Access denied"
-        case .restricted:
-            return "Access restricted"
-        }
+        .interactiveDismissDisabled(isSigningOut)
     }
 }
 
 #Preview {
-    SettingsView()
-        .environmentObject(PermissionsManager())
-        .environmentObject(AuthManager())
+    NavigationView {
+        SettingsView()
+            .environmentObject(PermissionsManager())
+            .environmentObject(AuthManager())
+            .environmentObject(MusicManager())
+    }
+}
+
+// Add displayText extension if not already present
+extension PermissionStatus {
+    var displayText: String {
+        switch self {
+        case .notDetermined: return "Not Set"
+        case .authorized: return "Allowed"
+        case .denied: return "Denied"
+        case .restricted: return "Restricted"
+        }
+    }
 } 

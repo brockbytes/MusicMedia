@@ -1,9 +1,10 @@
 import Foundation
 import FirebaseFirestore
 import MediaPlayer
+import FirebaseAuth
 
 struct User: Identifiable, Codable {
-    @DocumentID var id: String?
+    var id: String?
     let username: String
     let email: String
     var displayName: String
@@ -12,13 +13,15 @@ struct User: Identifiable, Codable {
     var currentlyPlaying: Song?
     var followers: [String]
     var following: [String]
+    var posts: [Post]
     var listeningPrivacy: ListeningPrivacy
     var discoveryDistance: Double
     var notificationSettings: NotificationSettings
     
     // Friend-related computed properties
     var isFriend: Bool {
-        get { false } // TODO: Implement friend check logic
+        guard let currentUserId = Auth.auth().currentUser?.uid else { return false }
+        return followers.contains(currentUserId) && following.contains(currentUserId)
     }
     var friendRequestSent: Bool {
         get { false } // TODO: Implement friend request check logic
@@ -72,9 +75,13 @@ struct User: Identifiable, Codable {
         self.displayName = displayName
         self.followers = []
         self.following = []
+        self.posts = []
         self.listeningPrivacy = .public_
         self.discoveryDistance = 1000 // Default 1km
         self.notificationSettings = NotificationSettings()
+        self.profileImageUrl = nil
+        self.bio = nil
+        self.currentlyPlaying = nil
     }
     
     init(from decoder: Decoder) throws {
@@ -87,8 +94,9 @@ struct User: Identifiable, Codable {
         self.profileImageUrl = try container.decodeIfPresent(String.self, forKey: .profileImageUrl)
         self.bio = try container.decodeIfPresent(String.self, forKey: .bio)
         self.currentlyPlaying = try container.decodeIfPresent(Song.self, forKey: .currentlyPlaying)
-        self.followers = try container.decodeIfPresent([String].self, forKey: .followers) ?? []
-        self.following = try container.decodeIfPresent([String].self, forKey: .following) ?? []
+        self.followers = try container.decode([String].self, forKey: .followers)
+        self.following = try container.decode([String].self, forKey: .following)
+        self.posts = try container.decodeIfPresent([Post].self, forKey: .posts) ?? []
         
         // Special handling for listeningPrivacy
         if let privacyString = try container.decodeIfPresent(String.self, forKey: .listeningPrivacy) {
@@ -102,7 +110,7 @@ struct User: Identifiable, Codable {
             self.listeningPrivacy = .public_
         }
         
-        self.discoveryDistance = try container.decodeIfPresent(Double.self, forKey: .discoveryDistance) ?? 1000
+        self.discoveryDistance = try container.decode(Double.self, forKey: .discoveryDistance)
         
         // Handle notification settings
         if let notificationDict = try container.decodeIfPresent([String: Bool].self, forKey: .notificationSettings) {
@@ -128,6 +136,7 @@ struct User: Identifiable, Codable {
         try container.encodeIfPresent(currentlyPlaying, forKey: .currentlyPlaying)
         try container.encode(followers, forKey: .followers)
         try container.encode(following, forKey: .following)
+        try container.encode(posts, forKey: .posts)
         try container.encode(listeningPrivacy, forKey: .listeningPrivacy)
         try container.encode(discoveryDistance, forKey: .discoveryDistance)
         try container.encode(notificationSettings, forKey: .notificationSettings)
@@ -143,6 +152,7 @@ struct User: Identifiable, Codable {
         case currentlyPlaying
         case followers
         case following
+        case posts
         case listeningPrivacy
         case discoveryDistance
         case notificationSettings
